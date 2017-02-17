@@ -1,3 +1,5 @@
 .idea
 *.png
 .DS_Store
+training_data.pkl
+training_labels.pkl
