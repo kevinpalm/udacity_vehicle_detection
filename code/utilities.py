@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.misc import imread
+from preprocess import HogPreprocessor
 
 def get_image_locations():
     """ Get a list of all the training images that are going to be used for training data """
@@ -74,24 +75,50 @@ def read_images(df):
     return images
 
 
+def plot_preprocessor(image, preprocessor):
+
+    # Make a visualization of the preprocessor transform
+    visualization = preprocessor[1].make_visualization(image)
+
+    # Plot the example
+    fig = plt.figure()
+    plt.subplot(121)
+    print(image.shape)
+    plt.imshow(image, cmap='gray')
+    plt.title('Example Car Image')
+    plt.subplot(122)
+    plt.imshow(visualization, cmap='gray')
+    plt.title('Example {}'.format(preprocessor[0]))
+    plt.savefig("../output_images/{}.jpg".format(preprocessor[0].lower().replace(" ", "_")))
+    plt.clf()
+
+
+
 def main():
     """ Graph the training class proportions and save pickle training data files"""
 
-    # Retreive the file locations
-    training_file_locations = get_image_locations()
+    # # Retreive the file locations
+    # training_file_locations = get_image_locations()
+    #
+    # # Format the file locations to a pandas dataframe
+    # training_df = format_image_locations(training_file_locations)
+    #
+    # # Graph the class proportions
+    # summarize_classes(training_df)
+    #
+    # # Read in the images
+    # images = read_images(training_df)
+    #
+    # # Pickle the formatted data
+    # training_df.to_pickle("../model_saves/training_labels.pkl")
+    # images.dump("../model_saves/training_data.pkl")
 
-    # Format the file locations to a pandas dataframe
-    training_df = format_image_locations(training_file_locations)
+    # Plot some examples of preprocessing steps
+    example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
+    preprocessors = [("Gray HOG", HogPreprocessor(color_channel="gray"))]
+    for preprocessor in preprocessors:
+        plot_preprocessor(example, preprocessor)
 
-    # Graph the class proportions
-    summarize_classes(training_df)
-
-    # Read in the images
-    images = read_images(training_df)
-
-    # Pickle the formatted data
-    training_df.to_pickle("../model_saves/training_labels.pkl")
-    images.dump("../model_saves/training_data.pkl")
 
 if __name__ == '__main__':
     main()
