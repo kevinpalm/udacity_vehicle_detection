@@ -1,10 +1,11 @@
-from preprocess import HogPreprocessor, HistoPreprocessor
+from preprocess import HogPreprocessor, HistoPreprocessor, CannyBinPreprocessor
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
 
 
 def test_hog_channels(x, y):
@@ -84,6 +85,47 @@ def test_hist_channels(x, y):
     Using hue as the color channel,the accuracy was 0.8029279279279279
     """
 
+def test_canny_bins(x, y):
+    """ Try using the canny bins as the only features, just for an idea of their descriptiveness """
+
+    print("Starting the canny bin test...")
+
+    # Split the dataset up
+    train_x, test_x, train_y, test_y = train_test_split(x, y)
+
+    # Define and train estimator
+    estimator = Pipeline([("cb", CannyBinPreprocessor()),
+                          ("scale", MinMaxScaler()),
+                          ("svc", LinearSVC())]).fit(train_x, train_y)
+
+    # Report a score
+    print("The accuracy was {}".format(accuracy_score(test_y, estimator.predict(test_x))))
+
+
+def run_local_test(preprocessors, estimator, x, y):
+    """ Run a local test by splitting the data to help with tuning"""
+
+    print("Starting a local test...")
+
+    # Split the dataset up
+    train_x, test_x, train_y, test_y = train_test_split(x, y)
+
+    # Train each of the preprocessors
+    trained_preprocessors = []
+    for preprocessor in preprocessors:
+        trained_preprocessors.append(preprocessor.fit(train_x, train_y))
+
+    # Apply the preprocessing
+    preprocessed_train_x = np.concatenate([x.transform(train_x) for x in trained_preprocessors], axis=1)
+    preprocessed_test_x = np.concatenate([x.transform(test_x) for x in trained_preprocessors], axis=1)
+
+    print("Fitting the estimator to {} final features...".format(preprocessed_train_x.shape[1]))
+
+    # Train the estimator
+    estimator.fit(preprocessed_train_x, train_y)
+
+    # Report a score
+    print("The local test AUC was {}".format(roc_auc_score(test_y, estimator.predict(preprocessed_test_x))))
 
 
 def main():
@@ -97,6 +139,9 @@ def main():
 
     # Run some tests to determine which color channel to use for hist features
     test_hist_channels(data, labels["vehicle"].values)
+
+    # Try using canny bins as the only features
+    test_canny_bins(data, labels["vehicle"].values)
 
 
 if __name__ == '__main__':

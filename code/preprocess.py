@@ -1,5 +1,5 @@
 from sklearn.base import TransformerMixin
-from skimage.feature import hog
+from skimage.feature import hog, canny
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -165,7 +165,7 @@ class HistoPreprocessor(Preprocessor):
         X = self.ensure_scale(X)
 
         # Prepare a histogram
-        X = np.histogram(X, bins=self.nbins, range=(0.0, 1.0))[0]
+        X = np.float64(np.histogram(X, bins=self.nbins, range=(0.0, 1.0))[0])
 
         return X
 
@@ -192,3 +192,78 @@ class HistoPreprocessor(Preprocessor):
         visualization = (bin_centers, X)
 
         return visualization, "histo"
+
+
+class CannyBinPreprocessor(Preprocessor):
+    """ Applies a canny edge transform, divides up the image into quadrants, and sums up the live pixels"""
+
+    def __init__(self, color_channel="gray", nbins=64):
+
+        # Run Preprocessor init as well
+        super().__init__(color_channel=color_channel)
+
+        # Store arguments
+        self.nbins = int(nbins/2)
+
+
+    def pipeline(self, X):
+        """ The list of operations to apply per each image"""
+
+        # Convert the color
+        X = self.color_transform(X)
+
+        # Equalize for consistent contrast
+        X = cv2.equalizeHist(X)
+
+        # Ensure the scale
+        X = self.ensure_scale(X)
+
+        # Apply the canny transform
+        X = canny(X)
+
+        # X Bin and histogram
+        x_summary = np.mean(X, axis=1)
+        x_summary = np.histogram(x_summary, bins=self.nbins)[0]
+
+        # Y Bin and Histogram
+        y_summary = np.mean(X, axis=0)
+        y_summary = np.histogram(y_summary, bins=self.nbins)[0]
+
+        # Final output
+        X = np.float64(np.append(x_summary, y_summary))
+
+        return X
+
+    def make_visualization(self, X):
+        """ Apply a canny edge transform, divide up the image into quadrants, and sum up the live pixels"""
+
+        # Convert the color
+        X = self.color_transform(X)
+
+        # Equalize for consent contrast
+        X = cv2.equalizeHist(X)
+
+        # Ensure the scale
+        X = self.ensure_scale(X)
+
+        # Apply the canny transform
+        X = canny(X)
+
+        # X Bin and histogram
+        x_summary = np.mean(X, axis=0)
+        x_summary = np.histogram(x_summary, bins=self.nbins)
+        x_features = x_summary[0]
+        x_edges = x_summary[1]
+        x_centers = (x_edges[1:] + x_edges[0:len(x_edges) - 1]) / 2
+
+        # Y Bin and Histogram
+        y_summary = np.mean(X, axis=1)
+        y_summary = np.histogram(y_summary, bins=self.nbins)
+        y_features = y_summary[0]
+        y_edges = y_summary[1]
+        y_centers = (y_edges[1:] + y_edges[0:len(y_edges) - 1]) / 2
+
+        # Tuple the features and centers to stand in for a visualization
+        visualization = [(y_centers, y_features), (x_centers, x_features)]
+
+        return visualization, "canny"

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.misc import imread
-from preprocess import HogPreprocessor, HistoPreprocessor
+from preprocess import HogPreprocessor, HistoPreprocessor, CannyBinPreprocessor
 
 def get_image_locations():
     """ Get a list of all the training images that are going to be used for training data """
@@ -80,26 +80,41 @@ def plot_preprocessor(image, preprocessor):
     # Make a visualization of the preprocessor transform
     visualization, type = preprocessor[1].make_visualization(image)
 
-    # Prep the example
-    fig = plt.figure()
-    plt.subplot(121)
-    plt.imshow(image, cmap='gray')
-    plt.title('Example Car Image')
-    ax = plt.subplot(122)
-
     # Visualize based on the type
     if type == "hog":
+        fig = plt.figure()
+        plt.subplot(121)
+        plt.imshow(image, cmap='gray')
+        plt.title('Example Car Image')
+        ax = plt.subplot(122)
         plt.imshow(visualization, cmap='gray')
+        plt.title('Example {}'.format(preprocessor[0]))
+
     elif type == "histo":
-        # Make the plot
+        fig = plt.figure()
+        plt.subplot(121)
+        plt.imshow(image, cmap='gray')
+        plt.title('Example Car Image')
+        ax = plt.subplot(122)
         ax.bar(visualization[0], visualization[1], width=1/32)
         ax.set_xlim([0, 1])
+        plt.title('Example {}'.format(preprocessor[0]))
+
+    elif type == "canny":
+        fig = plt.figure(figsize=(12, 4))
+        plt.subplot(131)
+        plt.imshow(image, cmap='gray')
+        plt.title('Example Car Image')
+        ax = plt.subplot(132)
+        ax.bar(visualization[0][0], visualization[0][1], width=0.02)
+        plt.title('X-axis Mean Canny Histogram')
+        ax2 = plt.subplot(133)
+        ax2.barh(visualization[1][0], visualization[1][1], height=0.02)
+        plt.title('Y-axis Mean Canny Histogram'.format(preprocessor[0]))
 
     # Finish and save
-    plt.title('Example {}'.format(preprocessor[0]))
     plt.savefig("../output_images/{}.jpg".format(preprocessor[0].lower().replace(" ", "_")))
     plt.clf()
-
 
 
 def main():
@@ -126,7 +141,8 @@ def main():
     preprocessors = [("Lightness HOG", HogPreprocessor(color_channel="lightness")),
                      ("Red Histogram", HistoPreprocessor(color_channel="red")),
                      ("Green Histgram", HistoPreprocessor(color_channel="green")),
-                     ("Blue Histogram", HistoPreprocessor(color_channel="blue"))]
+                     ("Blue Histogram", HistoPreprocessor(color_channel="blue")),
+                     ("Canny Bin Histogram", CannyBinPreprocessor())]
     for preprocessor in preprocessors:
         plot_preprocessor(example, preprocessor)
 
