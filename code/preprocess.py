@@ -2,6 +2,7 @@ from sklearn.base import TransformerMixin
 from skimage.feature import hog
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Preprocessor(TransformerMixin):
     """ Meta class for this project's prepocessors, handling scale and color transforms"""
@@ -30,10 +31,10 @@ class Preprocessor(TransformerMixin):
             output = input[:,:,0]
         # Green
         elif self.color_channel == "green":
-            output = input[:,:,0]
+            output = input[:,:,1]
         # Blue
         elif self.color_channel == "blue":
-            output = input[:,:,0]
+            output = input[:,:,2]
         # Hue
         elif self.color_channel == "hue":
             output = cv2.cvtColor(input, cv2.COLOR_RGB2HLS)[:,:,0]
@@ -69,7 +70,7 @@ class Preprocessor(TransformerMixin):
     def fit(self, X, y=None):
         """ Just a placeholder for the fit method if this is added to a sklearn pipeline"""
 
-        pass
+        return self
 
 
     def pipeline(self, X):
@@ -97,11 +98,11 @@ class Preprocessor(TransformerMixin):
 
 
 class HogPreprocessor(Preprocessor):
-    """ Preprocessor for Hog features"""
+    """ Preprocessor for Hog features """
 
     def __init__(self, color_channel="gray", pix_per_cell=8, cell_per_block=2, orient=2):
 
-        # Run Proprocessor init as well
+        # Run Preprocessor init as well
         super().__init__(color_channel=color_channel)
 
         # Store arguments
@@ -140,6 +141,54 @@ class HogPreprocessor(Preprocessor):
         X, visualization = hog(X, orientations=self.orient, pixels_per_cell=(self.pix_per_cell, self.pix_per_cell),
                        cells_per_block=(self.cell_per_block, self.cell_per_block), visualise=True, feature_vector=False)
 
-        return visualization
+        return visualization, "hog"
 
 
+class HistoPreprocessor(Preprocessor):
+    """ Preprocessor for creating histogram summary features """
+
+    def __init__(self, color_channel="gray", nbins=32):
+
+        # Run Preprocessor init as well
+        super().__init__(color_channel=color_channel)
+
+        # Store arguments
+        self.nbins = nbins
+
+    def pipeline(self, X):
+        """ The list of opperations to apply per each image"""
+
+        # Convert the color
+        X = self.color_transform(X)
+
+        # Ensure the scale
+        X = self.ensure_scale(X)
+
+        # Prepare a histogram
+        X = np.histogram(X, bins=self.nbins, range=(0.0, 1.0))[0]
+
+        return X
+
+    def make_visualization(self, X):
+        """ Return a histogram visualization from a single example image"""
+
+        # Convert the color
+        X = self.color_transform(X)
+
+        # Ensure the scale
+        X = self.ensure_scale(X)
+
+        # Calculate the histogram
+        hist = np.histogram(X, bins=self.nbins, range=(0.0, 1.0))
+
+        # Save the features
+        X = hist[0]
+
+        # Save the bin definitions
+        bin_edges = hist[1]
+        bin_centers = (bin_edges[1:] + bin_edges[0:len(bin_edges) - 1]) / 2
+
+        # Tuple the features and centers to stand in for a visualization
+        visualization = (bin_centers, X)
+
+        return visualization, "histo"

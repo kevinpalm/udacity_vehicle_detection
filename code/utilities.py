@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.misc import imread
-from preprocess import HogPreprocessor
+from preprocess import HogPreprocessor, HistoPreprocessor
 
 def get_image_locations():
     """ Get a list of all the training images that are going to be used for training data """
@@ -78,16 +78,24 @@ def read_images(df):
 def plot_preprocessor(image, preprocessor):
 
     # Make a visualization of the preprocessor transform
-    visualization = preprocessor[1].make_visualization(image)
+    visualization, type = preprocessor[1].make_visualization(image)
 
-    # Plot the example
+    # Prep the example
     fig = plt.figure()
     plt.subplot(121)
-    print(image.shape)
     plt.imshow(image, cmap='gray')
     plt.title('Example Car Image')
-    plt.subplot(122)
-    plt.imshow(visualization, cmap='gray')
+    ax = plt.subplot(122)
+
+    # Visualize based on the type
+    if type == "hog":
+        plt.imshow(visualization, cmap='gray')
+    elif type == "histo":
+        # Make the plot
+        ax.bar(visualization[0], visualization[1], width=1/32)
+        ax.set_xlim([0, 1])
+
+    # Finish and save
     plt.title('Example {}'.format(preprocessor[0]))
     plt.savefig("../output_images/{}.jpg".format(preprocessor[0].lower().replace(" ", "_")))
     plt.clf()
@@ -115,7 +123,10 @@ def main():
 
     # Plot some examples of preprocessing steps
     example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
-    preprocessors = [("Gray HOG", HogPreprocessor(color_channel="gray"))]
+    preprocessors = [("Lightness HOG", HogPreprocessor(color_channel="lightness")),
+                     ("Red Histogram", HistoPreprocessor(color_channel="red")),
+                     ("Green Histgram", HistoPreprocessor(color_channel="green")),
+                     ("Blue Histogram", HistoPreprocessor(color_channel="blue"))]
     for preprocessor in preprocessors:
         plot_preprocessor(example, preprocessor)
 
