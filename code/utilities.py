@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.misc import imread
 from preprocess import HogPreprocessor, HistoPreprocessor, CannyBinPreprocessor
+from model import load_pretrained, make_estimates
 
 def get_image_locations():
     """ Get a list of all the training images that are going to be used for training data """
@@ -116,6 +117,39 @@ def plot_preprocessor(image, preprocessor):
     plt.savefig("../output_images/{}.jpg".format(preprocessor[0].lower().replace(" ", "_")))
     plt.clf()
 
+def estimator_sample_results():
+
+    # Load the model
+    pre_locs = ["../model_saves/preprocessor_lightness_hog.pkl", "../model_saves/preprocessor_red_histo.pkl",
+                "../model_saves/preprocessor_green_histo.pkl", "../model_saves/preprocessor_blue_histo.pkl",
+                "../model_saves/preprocessor_canny_bin.pkl"]
+    est_loc = "../model_saves/estimator.pkl"
+    preprocessors, estimator = load_pretrained(pre_locs, est_loc)
+
+    # Load the labels
+    labels = pd.read_pickle("../model_saves/training_labels.pkl")
+    cars = labels[labels["vehicle"] == 1]
+    noncars = labels[labels["vehicle"] == 0]
+    samples = cars.sample(n=3).append(noncars.sample(n=3))["file"].tolist()
+
+    # Draw and estimate each sample
+    fig = plt.figure(figsize=(12, 3))
+    fig.suptitle("Example Estimated Likelihood of Vehicles:", fontsize=14)
+    for n in range(6):
+
+        # Save and estimate the image
+        image = imread(samples[n])
+        imagea = np.array([image])
+        predict = np.round(make_estimates(imagea, preprocessors, estimator), decimals=3)
+        plt.subplot(1, 6, n+1)
+        plt.imshow(image, cmap="gray")
+        plt.title(str(predict[0]))
+
+    plt.tight_layout()
+    plt.savefig("../output_images/sample_training_estimates.jpg")
+    plt.clf()
+
+
 
 def main():
     """ Graph the training class proportions and save pickle training data files"""
@@ -135,16 +169,19 @@ def main():
     # # Pickle the formatted data
     # training_df.to_pickle("../model_saves/training_labels.pkl")
     # images.dump("../model_saves/training_data.pkl")
-
-    # Plot some examples of preprocessing steps
-    example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
-    preprocessors = [("Lightness HOG", HogPreprocessor(color_channel="lightness")),
-                     ("Red Histogram", HistoPreprocessor(color_channel="red")),
-                     ("Green Histgram", HistoPreprocessor(color_channel="green")),
-                     ("Blue Histogram", HistoPreprocessor(color_channel="blue")),
-                     ("Canny Bin Histogram", CannyBinPreprocessor())]
-    for preprocessor in preprocessors:
-        plot_preprocessor(example, preprocessor)
+    #
+    # # Plot some examples of preprocessing steps
+    # example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
+    # preprocessors = [("Lightness HOG", HogPreprocessor(color_channel="lightness")),
+    #                  ("Red Histogram", HistoPreprocessor(color_channel="red")),
+    #                  ("Green Histgram", HistoPreprocessor(color_channel="green")),
+    #                  ("Blue Histogram", HistoPreprocessor(color_channel="blue")),
+    #                  ("Canny Bin Histogram", CannyBinPreprocessor())]
+    # for preprocessor in preprocessors:
+    #     plot_preprocessor(example, preprocessor)
+    #
+    # # Make some examples of the estimator performance
+    # estimator_sample_results()
 
 
 if __name__ == '__main__':

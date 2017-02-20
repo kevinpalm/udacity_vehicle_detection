@@ -120,6 +120,18 @@ def load_pretrained(pre_locs, est_loc):
     return preprocessors, estimator
 
 
+def make_estimates(X, preprocessors, estimator):
+    """ Make predictions """
+
+    # Apply the preprocessing
+    preprocessed_X = np.concatenate([x.transform(X) for x in preprocessors], axis=1)
+
+    # Make predictions
+    predicts = estimator.predict(preprocessed_X)
+
+    return predicts
+
+
 def main():
     """ Model and estimate all the project materials """
 
