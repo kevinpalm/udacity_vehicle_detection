@@ -125,7 +125,7 @@ def run_local_test(preprocessors, estimator, x, y):
     estimator.fit(preprocessed_train_x, train_y)
 
     # Report a score
-    print("The local test AUC was {}".format(roc_auc_score(test_y, estimator.predict(preprocessed_test_x))))
+    print("The local test accuracy was {}".format(accuracy_score(test_y, estimator.predict(preprocessed_test_x))))
 
 
 def main():

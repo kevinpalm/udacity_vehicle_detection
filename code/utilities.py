@@ -140,10 +140,10 @@ def estimator_sample_results():
         # Save and estimate the image
         image = imread(samples[n])
         imagea = np.array([image])
-        predict = np.round(make_estimates(imagea, preprocessors, estimator), decimals=3)
+        predict = np.round(make_estimates(imagea, preprocessors, estimator, proba=True), decimals=3)
         plt.subplot(1, 6, n+1)
         plt.imshow(image, cmap="gray")
-        plt.title(str(predict[0]))
+        plt.title(str(predict[0][1]))
 
     plt.tight_layout()
     plt.savefig("../output_images/sample_training_estimates.jpg")

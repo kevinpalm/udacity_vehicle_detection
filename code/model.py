@@ -6,11 +6,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import SelectPercentile, SelectKBest
 from sklearn.pipeline import Pipeline
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import AdaBoostRegressor
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.externals import joblib
-from scipy.misc import imread
 
 
 def get_pipelines():
@@ -43,15 +42,15 @@ def get_pipelines():
                                ("scale2", MinMaxScaler()),
                                ("select", SelectPercentile(percentile=42))])]
 
-    # Define the estimator to use
-    classifier = GridSearchCV(AdaBoostRegressor(n_estimators=1000, learning_rate=0.01),
-                              {"base_estimator": [DecisionTreeRegressor(max_depth=3, splitter="random"),
-                                                  DecisionTreeRegressor(max_depth=2, splitter="random"),
-                                                  DecisionTreeRegressor(max_depth=1, splitter="random")]})
+    # Define the estimator
+    ada = GridSearchCV(AdaBoostClassifier(n_estimators=1000, learning_rate=0.01),
+                              {"base_estimator": [DecisionTreeClassifier(max_depth=3, splitter="random"),
+                                                  DecisionTreeClassifier(max_depth=2, splitter="random"),
+                                                  DecisionTreeClassifier(max_depth=1, splitter="random")]})
     estimator = Pipeline([("pca", PCA(svd_solver="randomized")),
                           ("scale", MinMaxScaler()),
                           ("select", SelectKBest(k=32)),
-                          ("ada", classifier)])
+                          ("clf", ada)])
 
     return preprocessors, estimator
 
@@ -120,20 +119,26 @@ def load_pretrained(pre_locs, est_loc):
     return preprocessors, estimator
 
 
-def make_estimates(X, preprocessors, estimator):
+def make_estimates(X, preprocessors, estimator, proba=False):
     """ Make predictions """
 
     # Apply the preprocessing
     preprocessed_X = np.concatenate([x.transform(X) for x in preprocessors], axis=1)
 
     # Make predictions
-    predicts = estimator.predict(preprocessed_X)
+    if proba is True:
+        predicts = estimator.predict_proba(preprocessed_X)
+    else:
+        predicts = estimator.predict(preprocessed_X)
 
     return predicts
 
 
 def main():
     """ Model and estimate all the project materials """
+
+    # # Run a local test with the current configuration
+    # test_pipelines()
 
     # Try and load already created preprocessors and estimator
     try:
