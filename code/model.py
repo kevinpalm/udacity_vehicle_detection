@@ -1,4 +1,6 @@
 from preprocess import HogPreprocessor, HistoPreprocessor, CannyBinPreprocessor
+from boxes import slide_window
+import cv2
 from tests import run_local_test
 import pandas as pd
 import numpy as np
@@ -133,12 +135,50 @@ def make_estimates(X, preprocessors, estimator, proba=False):
 
     return predicts
 
+def search_windows(img, windows, preprocessors, estimator):
+    """ Pass an image and the list of windows to be searched (output of slide_windows()) """
 
-def main():
-    """ Model and estimate all the project materials """
+    # Create an empty list to receive positive detection windows
+    on_windows = []
 
-    # # Run a local test with the current configuration
-    # test_pipelines()
+
+    # Get the images
+    images = np.array([cv2.resize(img[window[0][1]:window[1][1],
+                                  window[0][0]:window[1][0]], (64, 64)) for window in windows])
+
+    # Get the predictions
+    predicts = make_estimates(images, preprocessors, estimator)
+
+    # Build the active window list
+    for prediction, window in zip(predicts, windows):
+
+        # If positive then save the window
+        if prediction == 1:
+            on_windows.append(window)
+
+    # Return windows for positive detections
+    return on_windows
+
+
+def get_search_window_list():
+    """ Get a list of search windows appropriate to a 1280 x 720 image """
+
+    # Define the search parameters
+    x_start_stops = [(4, 1280), (0, 1280), (16, 1280)]
+    y_start_stops = [(380, 520), (400, 560), (420, 700)]
+    xy_windows = [(64, 64), (128, 128), (192, 192)]
+    xy_overlaps = [(0.25, 0.25), (0.5, 0.5), (0.75, 0.75)]
+
+    # Create a placeholder list
+    search_list = []
+
+    # Run though each set of windows and append
+    for xss, yss, w, o in zip(x_start_stops, y_start_stops, xy_windows, xy_overlaps):
+        search_list.extend(slide_window(x_start_stop=xss, y_start_stop=yss, xy_window=w, xy_overlap=o))
+
+    return search_list
+
+def load_model():
 
     # Try and load already created preprocessors and estimator
     try:
@@ -152,6 +192,19 @@ def main():
     except:
         print("Model load failed, creating from scratch...")
         preprocessors, estimator = scratch_train_save()
+
+    return preprocessors, estimator
+
+def main():
+    """ Model and estimate all the project materials """
+
+    # # Run a local test with the current configuration
+    # test_pipelines()
+
+    preprocessors, estimator = load_model()
+
+    search_list = get_search_window_list()
+    print(len(search_list))
 
 
 if __name__ == '__main__':
