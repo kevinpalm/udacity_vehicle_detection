@@ -6,7 +6,8 @@ import numpy as np
 from scipy.misc import imread
 import pandas as pd
 from model import get_search_window_list, search_windows, load_model
-from boxes import draw_boxes
+from boxes import draw_boxes, add_heat, apply_threshold, draw_labeled_bboxes
+from scipy.ndimage.measurements import label
 
 def summarize_classes(df):
     """ Check and plot the training examples class proportions """
@@ -64,9 +65,9 @@ def plot_preprocessor(image, preprocessor):
 def estimator_sample_results():
 
     # Load the model
-    pre_locs = ["../model_saves/preprocessor_lightness_hog.pkl", "../model_saves/preprocessor_red_histo.pkl",
+    pre_locs = ["../model_saves/preprocessor_gray_hog.pkl", "../model_saves/preprocessor_red_histo.pkl",
                 "../model_saves/preprocessor_green_histo.pkl", "../model_saves/preprocessor_blue_histo.pkl",
-                "../model_saves/preprocessor_canny_bin.pkl"]
+                "../model_saves/preprocessor_gray_canny_bin.pkl"]
     est_loc = "../model_saves/estimator.pkl"
     preprocessors, estimator = load_pretrained(pre_locs, est_loc)
 
@@ -78,16 +79,16 @@ def estimator_sample_results():
 
     # Draw and estimate each sample
     fig = plt.figure(figsize=(12, 3))
-    fig.suptitle("Example Estimated Likelihood of Vehicles:", fontsize=14)
+    fig.suptitle("Example Predictions:", fontsize=14)
     for n in range(6):
 
         # Save and estimate the image
         image = imread(samples[n])
         imagea = np.array([image])
-        predict = np.round(make_estimates(imagea, preprocessors, estimator, proba=True), decimals=3)
+        predict = np.round(make_estimates(imagea, preprocessors, estimator), decimals=3)
         plt.subplot(1, 6, n+1)
         plt.imshow(image, cmap="gray")
-        plt.title(str(predict[0][1]))
+        plt.title(str(predict[0]))
 
     plt.tight_layout()
     plt.savefig("../output_images/sample_training_estimates.jpg")
@@ -135,6 +136,75 @@ def draw_active_windows():
     plt.savefig("../output_images/active_windows.jpg")
     plt.clf()
 
+def draw_heatmap():
+
+    # Read in a sample
+    example = imread("../test_images/test1.jpg")
+
+    # Get the search list
+    windows = get_search_window_list()
+
+    # Load the model
+    preprocessors, estimator = load_model()
+
+    # Search for active windows
+    on_windows = search_windows(example, windows, preprocessors, estimator)
+
+
+    # Create a heatmap
+    heatmap = np.zeros(example.shape[:2])
+    heatmap = add_heat(heatmap, on_windows)
+    heatmap = heatmap * 255/heatmap.max()
+
+    # Save the image
+    fig = plt.figure()
+    plt.imshow(heatmap, cmap="afmhot")
+    plt.savefig("../output_images/heatmap.jpg")
+    plt.clf()
+
+
+def draw_labels_boxes():
+
+    # Read in a sample
+    example = imread("../test_images/test1.jpg")
+
+    # Get the search list
+    windows = get_search_window_list()
+
+    # Load the model
+    preprocessors, estimator = load_model()
+
+    # Search for active windows
+    box_list = search_windows(example, windows, preprocessors, estimator)
+
+    # Create a heatmap
+    heat = np.zeros(example.shape[:2])
+
+    # Add heat to each box in box list
+    heat = add_heat(heat, box_list)
+
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat, 1)
+
+    # Visualize the heatmap when displaying
+    heatmap = np.clip(heat, 0, 255)
+
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    draw_img = draw_labeled_bboxes(np.copy(example), labels)
+
+    fig = plt.figure(figsize=(10, 4))
+    plt.subplot(121)
+    plt.imshow(draw_img)
+    plt.title('Car Positions')
+    plt.subplot(122)
+    plt.imshow(heatmap, cmap='hot')
+    plt.title('Threshold Heat Map')
+    fig.tight_layout()
+    plt.savefig("../output_images/final_classify.jpg")
+    plt.clf()
+
+
 def main():
     """ Graph the training class proportions and save pickle training data files"""
 
@@ -154,24 +224,30 @@ def main():
     # training_df.to_pickle("../model_saves/training_labels.pkl")
     # images.dump("../model_saves/training_data.pkl")
     #
-    # # Plot some examples of preprocessing steps
-    # example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
-    # preprocessors = [("Lightness HOG", HogPreprocessor(color_channel="lightness")),
-    #                  ("Red Histogram", HistoPreprocessor(color_channel="red")),
-    #                  ("Green Histgram", HistoPreprocessor(color_channel="green")),
-    #                  ("Blue Histogram", HistoPreprocessor(color_channel="blue")),
-    #                  ("Canny Bin Histogram", CannyBinPreprocessor())]
-    # for preprocessor in preprocessors:
-    #     plot_preprocessor(example, preprocessor)
-    #
-    # # Make some examples of the estimator performance
-    # estimator_sample_results()
+    # Plot some examples of preprocessing steps
+    example = imread("../input_images/vehicles/GTI_MiddleClose/image0122.png")
+    preprocessors = [("Gray HOG", HogPreprocessor(color_channel="gray")),
+                     ("Red Histogram", HistoPreprocessor(color_channel="red")),
+                     ("Green Histgram", HistoPreprocessor(color_channel="green")),
+                     ("Blue Histogram", HistoPreprocessor(color_channel="blue")),
+                     ("Canny Bin Histogram", CannyBinPreprocessor())]
+    for preprocessor in preprocessors:
+        plot_preprocessor(example, preprocessor)
+
+    # Make some examples of the estimator performance
+    estimator_sample_results()
 
     # Show the search windows
     draw_search_windows()
 
     # Show the active windows
     draw_active_windows()
+
+    # Show the heatmap
+    draw_heatmap()
+
+    # Show the final estimates
+    draw_labels_boxes()
 
 if __name__ == '__main__':
     main()

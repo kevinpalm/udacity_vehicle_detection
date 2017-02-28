@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-""" This python file is pretty much straight from the Udacity examples """
+""" This python file is mostly straight from the Udacity examples """
 
 def slide_window(x_start_stop=(0, 1280), y_start_stop=(0, 720), xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
     """ takes an image, start and stop positions in both x and y,
@@ -55,3 +55,46 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
 
     # Return the image copy with boxes drawn
     return imcopy
+
+
+def add_heat(heatmap, bbox_list):
+
+    # Iterate through list of bboxes
+    for box in bbox_list:
+
+        # Add += 1 for all pixels inside each bbox
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+
+    # Return updated heatmap
+    return heatmap
+
+
+def apply_threshold(heatmap, threshold):
+
+    # Zero out pixels below the threshold
+    heatmap[heatmap <= threshold] = 0
+
+    # Return thresholded map
+    return heatmap
+
+
+def draw_labeled_bboxes(img, labels):
+
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1]+1):
+
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+
+    # Return the image
+    return img

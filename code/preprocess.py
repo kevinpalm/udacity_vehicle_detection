@@ -100,7 +100,7 @@ class Preprocessor(TransformerMixin):
 class HogPreprocessor(Preprocessor):
     """ Preprocessor for Hog features """
 
-    def __init__(self, color_channel="gray", pix_per_cell=8, cell_per_block=2, orient=2):
+    def __init__(self, color_channel="gray", pix_per_cell=8, cell_per_block=2, orient=9):
 
         # Run Preprocessor init as well
         super().__init__(color_channel=color_channel)
@@ -115,6 +115,9 @@ class HogPreprocessor(Preprocessor):
 
         # Convert the color
         X = self.color_transform(X)
+
+        # Equalize for consent contrast
+        X = cv2.equalizeHist(X)
 
         # Ensure the scale
         X = self.ensure_scale(X)
@@ -160,6 +163,9 @@ class HistoPreprocessor(Preprocessor):
 
         # Convert the color
         X = self.color_transform(X)
+
+        # Equalize for consent contrast
+        X = cv2.equalizeHist(X)
 
         # Ensure the scale
         X = self.ensure_scale(X)

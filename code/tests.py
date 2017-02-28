@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 
@@ -107,8 +107,17 @@ def run_local_test(preprocessors, estimator, x, y):
 
     print("Starting a local test...")
 
+    # Load the labels again for splitting sets
+    labels = pd.read_pickle("../model_saves/training_labels.pkl")
+    labels["test"] = labels["file"].str.contains("GTI")
+    test = labels[labels["test"]==True].index
+    train = labels[labels["test"]==False].index
+
     # Split the dataset up
-    train_x, test_x, train_y, test_y = train_test_split(x, y)
+    train_x = x[train]
+    test_x = x[test]
+    train_y = y[train]
+    test_y = y[test]
 
     # Train each of the preprocessors
     trained_preprocessors = []
@@ -126,6 +135,7 @@ def run_local_test(preprocessors, estimator, x, y):
 
     # Report a score
     print("The local test accuracy was {}".format(accuracy_score(test_y, estimator.predict(preprocessed_test_x))))
+    print("The local test f1 was {}".format(f1_score(test_y, estimator.predict(preprocessed_test_x))))
 
 
 def main():

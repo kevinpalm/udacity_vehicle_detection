@@ -1,61 +1,78 @@
 from preprocess import HogPreprocessor, HistoPreprocessor, CannyBinPreprocessor
-from boxes import slide_window
+from boxes import *
 import cv2
 from tests import run_local_test
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.decomposition import PCA
-from sklearn.feature_selection import SelectPercentile, SelectKBest
 from sklearn.pipeline import Pipeline
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import GridSearchCV
 from sklearn.externals import joblib
+from scipy.ndimage.measurements import label
+from moviepy.editor import VideoFileClip
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectFwe, SelectKBest
+from sklearn.ensemble import GradientBoostingClassifier, VotingClassifier
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import RidgeClassifier, Perceptron
 
+
+# def get_pipelines():
+#     """ returns the untrained preprocessors and estimator """
+#
+#     # Define the preprocessors to use
+#     preprocessors = [Pipeline([("gray_hog", HogPreprocessor(color_channel="gray")),
+#                                ("scale1", MinMaxScaler()),
+#                                ("pca", PCA(svd_solver="randomized")),
+#                                ("scale2", MinMaxScaler()),
+#                                ("select", SelectFwe(alpha=0.01))]),
+#                      Pipeline([("red_histo", HistoPreprocessor(color_channel="red")),
+#                                ("scale1", MinMaxScaler()),
+#                                ("pca", PCA(svd_solver="randomized")),
+#                                ("scale2", MinMaxScaler()),
+#                                ("select", SelectFwe(alpha=0.01))]),
+#                      Pipeline([("green_histo", HistoPreprocessor(color_channel="green")),
+#                                ("scale1", MinMaxScaler()),
+#                                ("pca", PCA(svd_solver="randomized")),
+#                                ("scale2", MinMaxScaler()),
+#                                ("select", SelectFwe(alpha=0.01))]),
+#                      Pipeline([("blue_histo", HistoPreprocessor(color_channel="blue")),
+#                                ("scale1", MinMaxScaler()),
+#                                ("pca", PCA(svd_solver="randomized")),
+#                                ("scale2", MinMaxScaler()),
+#                                ("select", SelectFwe(alpha=0.01))]),
+#                      Pipeline([("gray_canny_bin", CannyBinPreprocessor(color_channel="gray")),
+#                                ("scale1", MinMaxScaler()),
+#                                ("pca", PCA(svd_solver="randomized")),
+#                                ("scale2", MinMaxScaler()),
+#                                ("select", SelectFwe(alpha=0.01))])]
+#
+#     estimator = Pipeline([("pca", PCA(svd_solver="randomized")),
+#                           ("scale", MinMaxScaler()),
+#                           ("select", SelectKBest(k=32)),
+#                           ("gb", GradientBoostingClassifier(subsample=0.5, n_estimators=1000, learning_rate=0.01))])
+#
+#     return preprocessors, estimator
 
 def get_pipelines():
     """ returns the untrained preprocessors and estimator """
 
     # Define the preprocessors to use
-    preprocessors = [Pipeline([("lightness_hog", HogPreprocessor(color_channel="lightness")),
-                               ("scale1", MinMaxScaler()),
-                               ("pca", PCA(svd_solver="randomized")),
-                               ("scale2", MinMaxScaler()),
-                               ("select", SelectPercentile(percentile=64))]),
+    preprocessors = [Pipeline([("gray_hog", HogPreprocessor(color_channel="gray")),
+                               ("scale1", MinMaxScaler())]),
                      Pipeline([("red_histo", HistoPreprocessor(color_channel="red")),
-                                ("scale1", MinMaxScaler()),
-                                ("pca", PCA(svd_solver="randomized")),
-                                ("scale2", MinMaxScaler()),
-                                ("select", SelectPercentile(percentile=48))]),
+                               ("scale1", MinMaxScaler())]),
                      Pipeline([("green_histo", HistoPreprocessor(color_channel="green")),
-                               ("scale1", MinMaxScaler()),
-                               ("pca", PCA(svd_solver="randomized")),
-                               ("scale2", MinMaxScaler()),
-                               ("select", SelectPercentile(percentile=48))]),
+                               ("scale1", MinMaxScaler())]),
                      Pipeline([("blue_histo", HistoPreprocessor(color_channel="blue")),
-                               ("scale1", MinMaxScaler()),
-                               ("pca", PCA(svd_solver="randomized")),
-                               ("scale2", MinMaxScaler()),
-                               ("select", SelectPercentile(percentile=48))]),
-                     Pipeline([("canny_bin", CannyBinPreprocessor()),
-                               ("scale1", MinMaxScaler()),
-                               ("pca", PCA(svd_solver="randomized")),
-                               ("scale2", MinMaxScaler()),
-                               ("select", SelectPercentile(percentile=42))])]
+                               ("scale1", MinMaxScaler())]),
+                     Pipeline([("gray_canny_bin", CannyBinPreprocessor(color_channel="gray")),
+                               ("scale1", MinMaxScaler())])]
 
-    # Define the estimator
-    ada = GridSearchCV(AdaBoostClassifier(n_estimators=1000, learning_rate=0.01),
-                              {"base_estimator": [DecisionTreeClassifier(max_depth=3, splitter="random"),
-                                                  DecisionTreeClassifier(max_depth=2, splitter="random"),
-                                                  DecisionTreeClassifier(max_depth=1, splitter="random")]})
-    estimator = Pipeline([("pca", PCA(svd_solver="randomized")),
-                          ("scale", MinMaxScaler()),
-                          ("select", SelectKBest(k=32)),
-                          ("clf", ada)])
+    estimator = VotingClassifier([("perceptron", Perceptron()),
+                                  ("ridge", RidgeClassifier(alpha=1000)),
+                                  ("svm", LinearSVC())])
 
     return preprocessors, estimator
-
 
 def test_pipelines():
     """ load the training data, get the pipelines, and run a train-test split test"""
@@ -99,7 +116,7 @@ def scratch_train_save():
     estimator.fit(preprocessed_data, labels["vehicle"].values)
 
     # Save the preprocessors
-    names = ["lightness_hog", "red_histo", "green_histo", "blue_histo", "canny_bin"]
+    names = ["gray_hog", "red_histo", "green_histo", "blue_histo", "gray_canny_bin"]
     for preprocessor, name in zip(trained_preprocessors, names):
         joblib.dump(preprocessor, '../model_saves/preprocessor_{}.pkl'.format(name))
 
@@ -129,7 +146,10 @@ def make_estimates(X, preprocessors, estimator, proba=False):
 
     # Make predictions
     if proba is True:
-        predicts = estimator.predict_proba(preprocessed_X)
+        try:
+            predicts = estimator.predict_proba(preprocessed_X)
+        except:
+            predicts = estimator.predict(preprocessed_X)
     else:
         predicts = estimator.predict(preprocessed_X)
 
@@ -164,10 +184,10 @@ def get_search_window_list():
     """ Get a list of search windows appropriate to a 1280 x 720 image """
 
     # Define the search parameters
-    x_start_stops = [(4, 1280), (0, 1280), (16, 1280)]
-    y_start_stops = [(380, 520), (400, 560), (420, 700)]
-    xy_windows = [(64, 64), (128, 128), (192, 192)]
-    xy_overlaps = [(0.25, 0.25), (0.5, 0.5), (0.75, 0.75)]
+    x_start_stops = [(0, 1280), (16, 1264), (0, 1280)]
+    y_start_stops = [(400, 656), (400, 608), (400, 528)]
+    xy_windows = [(128, 128), (96, 96), (64, 64)]
+    xy_overlaps = [(0.5, 0.5), (0.5, 0.5), (0.5, 0.5)]
 
     # Create a placeholder list
     search_list = []
@@ -182,9 +202,9 @@ def load_model():
 
     # Try and load already created preprocessors and estimator
     try:
-        pre_locs = ["../model_saves/preprocessor_lightness_hog.pkl", "../model_saves/preprocessor_red_histo.pkl",
-                    "../model_saves/preprocessor_green_histo.pkl", "../model_saves/preprocessor_blue_histo.pkl",
-                    "../model_saves/preprocessor_canny_bin.pkl"]
+        pre_locs = ["../model_saves/preprocessor_gray_hog.pkl",
+                    "../model_saves/preprocessor_red_histo.pkl", "../model_saves/preprocessor_green_histo.pkl",
+                    "../model_saves/preprocessor_blue_histo.pkl", "../model_saves/preprocessor_gray_canny_bin.pkl"]
         est_loc = "../model_saves/estimator.pkl"
         preprocessors, estimator = load_pretrained(pre_locs, est_loc)
 
@@ -195,16 +215,73 @@ def load_model():
 
     return preprocessors, estimator
 
+
+class BoxImageClassifer:
+    """ Helper class for actually making predictions"""
+
+    def __init__(self, preprocessors, estimator, windows):
+
+        self.preprocessors = preprocessors
+        self.estimator = estimator
+        self.windows = windows
+        self.past_frames = None
+
+    def predit(self, image):
+
+        # Search for active windows
+        box_list = search_windows(image, self.windows, self.preprocessors, self.estimator)
+
+        # Create a heatmap
+        heat = np.zeros(image.shape[:2])
+
+        # Add heat to each box in box list
+        heat = add_heat(heat, box_list)
+
+        # # Apply threshold to help remove false positives
+        # heat = apply_threshold(heat, 1)
+
+        # Check if this is the first frame
+        if self.past_frames is None:
+            self.past_frames = heat
+
+        # Otherwise, scale down the past frames and include in the calculation
+        else:
+            heat = heat + (self.past_frames*0.8)
+            self.past_frames = heat
+
+        # Apply threshold to help remove false positives
+        heat = apply_threshold(heat, 2.8)
+
+        # Visualize the heatmap when displaying
+        heatmap = np.clip(heat, 0, 255)
+
+        # Find final boxes from heatmap using label function
+        labels = label(heatmap)
+        draw_img = draw_labeled_bboxes(np.copy(image), labels)
+
+        return draw_img
+
+
 def main():
     """ Model and estimate all the project materials """
 
-    # # Run a local test with the current configuration
-    # test_pipelines()
+    # Run a local test with the current configuration
+    test_pipelines()
 
-    preprocessors, estimator = load_model()
-
-    search_list = get_search_window_list()
-    print(len(search_list))
+    # # Load the model
+    # preprocessors, estimator = load_model()
+    #
+    # # Load the search list
+    # search_list = get_search_window_list()
+    #
+    # # Define the classifer
+    # clf = BoxImageClassifer(preprocessors, estimator, search_list)
+    #
+    # # Highlight the video clips
+    # # "../project_video.mp4",
+    # for cliploc in ["../project_video.mp4"]:
+    #     clip = VideoFileClip(cliploc).fl_image(clf.predit)
+    #     clip.write_videofile(cliploc.replace("../", "../processed_"), audio=False)
 
 
 if __name__ == '__main__':
